@@ -28,6 +28,30 @@ defmodule Grid do
   defp in_constraint?(_coords, _constraint), do: false
 end
 
+defmodule Instructions do
+  @regex ~r/(.*)\s+(\d+),(\d+) through (\d+),(\d+)/
+
+  def run(path, module) do
+    instructions = read_instructions(path)
+    Enum.reduce(instructions, module.new(1000,1000), fn(instruction, lights) ->
+      [_, action, lxs, lys, uxs, uys] = Regex.run(@regex, instruction)
+      [lx, ly, ux, uy] = Enum.map([lxs,lys,uxs,uys], &String.to_integer/1)
+      case action do
+        "turn on" -> module.turn_on(lights, {{lx,ly},{ux,uy}})
+        "turn off" -> module.turn_off(lights, {{lx,ly},{ux,uy}})
+        "toggle" -> module.toggle(lights, {{lx,ly},{ux,uy}})
+      end
+    end)
+  end
+
+  defp read_instructions(path) do
+    path
+    |> File.read!
+    |> String.strip
+    |> String.split("\n")
+  end
+end
+
 defmodule Lights do
   import Grid
   def new(width \\ 1000, height \\ 1000), do: new(false, width, height)
@@ -72,23 +96,6 @@ defmodule LightsTest do
     assert how_many_on?(lights) == 9
   end
 end
-
-instructions = "input.txt"
-               |> File.read!
-               |> String.strip
-               |> String.split("\n")
-regex = ~r/(.*)\s+(\d+),(\d+) through (\d+),(\d+)/
-#lights = Enum.reduce(instructions, Lights.new(1000,1000), fn(instruction, lights) ->
-#  [_, action, lxs, lys, uxs, uys] = Regex.run(regex, instruction)
-#  [lx, ly, ux, uy] = Enum.map([lxs,lys,uxs,uys], &String.to_integer/1)
-#  case action do
-#    "turn on" -> Lights.turn_on(lights, {{lx,ly},{ux,uy}})
-#    "turn off" -> Lights.turn_off(lights, {{lx,ly},{ux,uy}})
-#    "toggle" -> Lights.toggle(lights, {{lx,ly},{ux,uy}})
-#  end
-#end)
-
-#IO.puts "there are #{Lights.how_many_on?(lights)} lights on now"
 
 defmodule Dimmers do
   import Grid
@@ -141,14 +148,8 @@ defmodule DimmersTest do
   end
 end
 
-#lights = Enum.reduce(instructions, Dimmers.new(1000,1000), fn(instruction, lights) ->
-#  [_, action, lxs, lys, uxs, uys] = Regex.run(regex, instruction)
-#  [lx, ly, ux, uy] = Enum.map([lxs,lys,uxs,uys], &String.to_integer/1)
-#  case action do
-#    "turn on" -> Dimmers.turn_on(lights, {{lx,ly},{ux,uy}})
-#    "turn off" -> Dimmers.turn_off(lights, {{lx,ly},{ux,uy}})
-#    "toggle" -> Dimmers.toggle(lights, {{lx,ly},{ux,uy}})
-#  end
-#end)
+lights = Instructions.run("input.txt", Lights)
+IO.puts "there are #{Lights.how_many_on?(lights)} lights on now"
 
-#IO.puts "the total brightness is #{Dimmers.total_brightness(lights)}"
+lights = Instructions.run("input.txt", Dimmers)
+IO.puts "the total brightness is #{Dimmers.total_brightness(lights)}"
