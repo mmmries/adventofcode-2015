@@ -10,22 +10,30 @@ defmodule Grid do
   def update_grid(grid, constraint, update_fn) do
     grid
     |> Enum.with_index
-    |> Enum.map(&( update_row(&1, constraint, update_fn) ))
+    |> Enum.map(fn({row, row_number}) ->
+      case row_in_constraint?(row_number, constraint) do
+        true -> update_row(row, constraint, update_fn)
+        false -> row
+      end
+    end)
   end
 
-  defp update_row({row, row_number}, constraint, update_fn) do
+  defp update_row(row, constraint, update_fn) do
     row
     |> Enum.with_index
     |> Enum.map(fn({light, column_number}) ->
-      case in_constraint?({row_number,column_number},constraint) do
+      case light_in_constraint?(column_number,constraint) do
         true -> update_fn.(light)
         false -> light
       end
     end)
   end
 
-  defp in_constraint?({x,y}, {{lx,ly},{ux,uy}}) when x >= lx and x <= ux and y >= ly and y <= uy, do: true
-  defp in_constraint?(_coords, _constraint), do: false
+  defp row_in_constraint?(y, {{_lx,ly},{_ux,uy}}) when y >= ly and y <= uy, do: true
+  defp row_in_constraint?(_y, _constraint), do: false
+
+  defp light_in_constraint?(x, {{lx,_ly},{ux,_uy}}) when x >= lx and x <= ux, do: true
+  defp light_in_constraint?(_x, _constraint), do: false
 end
 
 defmodule Instructions do
