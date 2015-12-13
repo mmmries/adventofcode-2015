@@ -1,11 +1,36 @@
 ExUnit.start
 
-defmodule Lights do
-  def new(width \\ 1000, height \\ 1000) do
+defmodule Grid do
+  def new(initial_value, width \\ 1000, height \\ 1000) do
     (0..height) |> Enum.map(fn (_i) ->
-      List.duplicate(false, width)
+      List.duplicate(initial_value, width)
     end)
   end
+
+  def update_grid(grid, constraint, update_fn) do
+    grid
+    |> Enum.with_index
+    |> Enum.map(&( update_row(&1, constraint, update_fn) ))
+  end
+
+  defp update_row({row, row_number}, constraint, update_fn) do
+    row
+    |> Enum.with_index
+    |> Enum.map(fn({light, column_number}) ->
+      case in_constraint?({row_number,column_number},constraint) do
+        true -> update_fn.(light)
+        false -> light
+      end
+    end)
+  end
+
+  defp in_constraint?({x,y}, {{lx,ly},{ux,uy}}) when x >= lx and x <= ux and y >= ly and y <= uy, do: true
+  defp in_constraint?(_coords, _constraint), do: false
+end
+
+defmodule Lights do
+  import Grid
+  def new(width \\ 1000, height \\ 1000), do: new(false, width, height)
 
   def how_many_on?(grid) do
     Enum.reduce(grid, 0, fn(row, acc) ->
@@ -14,33 +39,13 @@ defmodule Lights do
     end)
   end
 
-  def turn_on(grid, constraint), do: update_grid(grid, constraint, :on)
-  def turn_off(grid, constraint), do: update_grid(grid, constraint, :off)
-  def toggle(grid, constraint), do: update_grid(grid, constraint, :toggle)
+  def turn_on(grid, constraint), do: update_grid(grid, constraint, &turn_on_light/1)
+  def turn_off(grid, constraint), do: update_grid(grid, constraint, &turn_off_light/1)
+  def toggle(grid, constraint), do: update_grid(grid, constraint, &toggle_light/1)
 
-  defp update_grid(grid, constraint, action) do
-    grid
-    |> Enum.with_index
-    |> Enum.map(&( turn_on_row(&1, constraint, action) ))
-  end
-
-  defp turn_on_row({row, row_number}, constraint, action) do
-    row
-    |> Enum.with_index
-    |> Enum.map(fn({light, column_number}) ->
-      case in_constraint?({row_number,column_number},constraint) do
-        true -> update_light(light, action)
-        false -> light
-      end
-    end)
-  end
-
-  defp in_constraint?({x,y}, {{lx,ly},{ux,uy}}) when x >= lx and x <= ux and y >= ly and y <= uy, do: true
-  defp in_constraint?(_coords, _constraint), do: false
-
-  defp update_light(_, :on), do: true
-  defp update_light(_, :off), do: false
-  defp update_light(light, :toggle), do: !light
+  defp turn_on_light(_), do: true
+  defp turn_off_light(_), do: false
+  defp toggle_light(light), do: !light
 end
 
 defmodule LightsTest do
@@ -86,11 +91,9 @@ regex = ~r/(.*)\s+(\d+),(\d+) through (\d+),(\d+)/
 #IO.puts "there are #{Lights.how_many_on?(lights)} lights on now"
 
 defmodule Dimmers do
-  def new(width \\ 1000, height \\ 1000) do
-    (0..height) |> Enum.map(fn (_i) ->
-      List.duplicate(0, width)
-    end)
-  end
+  import Grid
+
+  def new(width \\ 1000, height \\ 1000), do: new(0, width, height)
 
   def total_brightness(grid) do
     Enum.reduce(grid, 0, fn(row, acc) ->
@@ -98,34 +101,14 @@ defmodule Dimmers do
     end)
   end
 
-  def turn_on(grid, constraint), do: update_grid(grid, constraint, :on)
-  def turn_off(grid, constraint), do: update_grid(grid, constraint, :off)
-  def toggle(grid, constraint), do: update_grid(grid, constraint, :toggle)
+  def turn_on(grid, constraint), do: update_grid(grid, constraint, &turn_on_light/1)
+  def turn_off(grid, constraint), do: update_grid(grid, constraint, &turn_off_light/1)
+  def toggle(grid, constraint), do: update_grid(grid, constraint, &toggle_light/1)
 
-  defp update_grid(grid, constraint, action) do
-    grid
-    |> Enum.with_index
-    |> Enum.map(&( turn_on_row(&1, constraint, action) ))
-  end
-
-  defp turn_on_row({row, row_number}, constraint, action) do
-    row
-    |> Enum.with_index
-    |> Enum.map(fn({light, column_number}) ->
-      case in_constraint?({row_number,column_number},constraint) do
-        true -> update_light(light, action)
-        false -> light
-      end
-    end)
-  end
-
-  defp in_constraint?({x,y}, {{lx,ly},{ux,uy}}) when x >= lx and x <= ux and y >= ly and y <= uy, do: true
-  defp in_constraint?(_coords, _constraint), do: false
-
-  defp update_light(light, :on), do: light + 1
-  defp update_light(0, :off), do: 0
-  defp update_light(light, :off), do: light - 1
-  defp update_light(light, :toggle), do: light + 2
+  defp turn_on_light(light), do: light + 1
+  defp turn_off_light(0), do: 0
+  defp turn_off_light(light), do: light - 1
+  defp toggle_light(light), do: light + 2
 end
 
 defmodule DimmersTest do
@@ -158,14 +141,14 @@ defmodule DimmersTest do
   end
 end
 
-lights = Enum.reduce(instructions, Dimmers.new(1000,1000), fn(instruction, lights) ->
-  [_, action, lxs, lys, uxs, uys] = Regex.run(regex, instruction)
-  [lx, ly, ux, uy] = Enum.map([lxs,lys,uxs,uys], &String.to_integer/1)
-  case action do
-    "turn on" -> Dimmers.turn_on(lights, {{lx,ly},{ux,uy}})
-    "turn off" -> Dimmers.turn_off(lights, {{lx,ly},{ux,uy}})
-    "toggle" -> Dimmers.toggle(lights, {{lx,ly},{ux,uy}})
-  end
-end)
+#lights = Enum.reduce(instructions, Dimmers.new(1000,1000), fn(instruction, lights) ->
+#  [_, action, lxs, lys, uxs, uys] = Regex.run(regex, instruction)
+#  [lx, ly, ux, uy] = Enum.map([lxs,lys,uxs,uys], &String.to_integer/1)
+#  case action do
+#    "turn on" -> Dimmers.turn_on(lights, {{lx,ly},{ux,uy}})
+#    "turn off" -> Dimmers.turn_off(lights, {{lx,ly},{ux,uy}})
+#    "toggle" -> Dimmers.toggle(lights, {{lx,ly},{ux,uy}})
+#  end
+#end)
 
-IO.puts "the total brightness is #{Dimmers.total_brightness(lights)}"
+#IO.puts "the total brightness is #{Dimmers.total_brightness(lights)}"
